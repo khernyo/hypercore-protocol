@@ -2,14 +2,14 @@ use crypto::salsa20::Salsa20;
 use crypto::symmetriccipher::SynchronousStreamCipher;
 
 // libsodium does not expose such an interface, so here it is.
-pub fn crypto_stream_xor_instance(nonce: &[u8], key: &[u8]) -> Xor {
+pub(crate) fn crypto_stream_xor_instance(nonce: &[u8], key: &[u8]) -> Xor {
     Xor(Salsa20::new_xsalsa20(key, nonce))
 }
 
-pub struct Xor(Salsa20);
+pub(crate) struct Xor(Salsa20);
 
 impl Xor {
-    pub fn update(&mut self, input: &[u8], output: &mut [u8]) {
+    pub(crate) fn update(&mut self, input: &[u8], output: &mut [u8]) {
         self.0.process(input, output);
     }
 }

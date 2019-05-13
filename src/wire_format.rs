@@ -1,65 +1,102 @@
-use std::io::Write;
+use std::io::{BufReader, Read, Write};
 
-use quick_protobuf::sizeofs::*;
-use quick_protobuf::writer::Writer;
-use quick_protobuf::{BytesReader, MessageWrite};
+use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
+use protobuf::{self, parse_from_reader, Message as _, ProtobufResult};
 
-use crate::{Channel, Message};
+use crate::{Channel, Header, Message, MessageType};
 
-pub fn write_msg<W: Write>(
-    channel: Channel,
-    msg: &Message,
-    writer: &mut Writer<W>,
-) -> quick_protobuf::Result<()> {
-    let msg_type = MessageType::from_message(&msg);
-    let header = encode_header(channel, msg_type);
-    let len = sizeof_varint(u64::from(header)) + get_size(msg);
-
-    writer.write_varint(len as u64)?;
-    writer.write_varint(u64::from(header))?;
-    write_message(msg, writer)
+pub(crate) fn write_msg(channel: Channel, msg: &Message) -> ProtobufResult<Vec<u8>> {
+    log::trace!("write_msg({:?}, {:?})", channel, msg);
+    let mut buf = Vec::new();
+    write_msg_to_writer(channel, msg, &mut buf)?;
+    log::trace!("write_msg => {:?}", buf);
+    Ok(buf)
 }
 
-pub fn read_msg<'a>(
-    reader: &mut BytesReader,
-    bytes: &'a [u8],
-) -> quick_protobuf::Result<(Channel, Message<'a>)> {
-    let len = reader.read_varint64(bytes)?;
-    let header = reader.read_varint64(bytes)?;
-    let header_len = sizeof_varint(header);
-    let (channel, msg_type) = decode_header(header as u16);
+pub(crate) fn write_msg_to_writer<W: Write>(
+    channel: Channel,
+    msg: &Message,
+    mut writer: W,
+) -> ProtobufResult<()> {
+    log::trace!("write_msg_to_writer({:?}, {:?})", channel, msg);
+    let message_type = MessageType::from_message(&msg);
+    let header = encode_header(Header {
+        channel,
+        message_type,
+    });
+    log::trace!(
+        "write_msg_to_writer channel: {:?}, message_type: {:?} => header: {}",
+        channel,
+        message_type,
+        header
+    );
 
-    let msg_len = len as usize - header_len;
-    let msg = match msg_type {
-        MessageType::Feed => Message::Feed(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Handshake => Message::Handshake(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Info => Message::Info(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Have => Message::Have(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Unhave => Message::Unhave(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Want => Message::Want(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Unwant => Message::Unwant(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Request => Message::Request(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Cancel => Message::Cancel(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Data => Message::Data(reader.read_message_by_len(bytes, msg_len)?),
-        MessageType::Extension => unimplemented!(),
-    };
+    let len = VarInt::required_space(u64::from(header)) + get_size(msg);
+    log::trace!("write_msg_to_writer len: {}", len);
+
+    writer.write_varint(len)?;
+    writer.write_varint(header)?;
+    write_message(msg, writer)?;
+    Ok(())
+}
+
+fn read_msg(bytes: &[u8]) -> ProtobufResult<(Channel, Message)> {
+    log::trace!("read_msg({:?})", bytes);
+    let mut reader = BufReader::new(bytes);
+    let (channel, msg) = read_msg_from_reader(&mut reader)?;
+    log::trace!("read_msg channel: {:?}, message: {:?}", channel, msg);
+    let mut remaining = Vec::new();
+    assert_eq!(reader.read_to_end(&mut remaining)?, 0);
+    Ok((channel, msg))
+}
+
+fn read_msg_from_reader<R: Read>(mut reader: R) -> ProtobufResult<(Channel, Message)> {
+    log::trace!("read_msg_from_reader()");
+    let len: usize = reader.read_varint()?;
+    let header = reader.read_varint()?;
+    log::trace!("read_msg_from_reader len: {}, header: {:?}", len, header);
+
+    let header_len = VarInt::required_space(header);
+    let msg_len = len - header_len;
+    log::trace!(
+        "read_msg_from_reader header_len: {}, msg_len: {}",
+        header_len,
+        msg_len
+    );
+
+    let Header {
+        channel,
+        message_type,
+    } = decode_header(header);
+    log::trace!(
+        "read_msg_from_reader channel: {:?}, message_type: {:?}",
+        channel,
+        message_type
+    );
+
+    let msg = read_msg2(message_type, reader)?;
 
     Ok((channel, msg))
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum MessageType {
-    Feed = 0,
-    Handshake = 1,
-    Info = 2,
-    Have = 3,
-    Unhave = 4,
-    Want = 5,
-    Unwant = 6,
-    Request = 7,
-    Cancel = 8,
-    Data = 9,
-    Extension = 15,
+pub(crate) fn read_msg2<R: Read>(
+    message_type: MessageType,
+    mut reader: R,
+) -> ProtobufResult<Message> {
+    let msg = match message_type {
+        MessageType::Feed => Message::Feed(parse_from_reader(&mut reader)?),
+        MessageType::Handshake => Message::Handshake(parse_from_reader(&mut reader)?),
+        MessageType::Info => Message::Info(parse_from_reader(&mut reader)?),
+        MessageType::Have => Message::Have(parse_from_reader(&mut reader)?),
+        MessageType::Unhave => Message::Unhave(parse_from_reader(&mut reader)?),
+        MessageType::Want => Message::Want(parse_from_reader(&mut reader)?),
+        MessageType::Unwant => Message::Unwant(parse_from_reader(&mut reader)?),
+        MessageType::Request => Message::Request(parse_from_reader(&mut reader)?),
+        MessageType::Cancel => Message::Cancel(parse_from_reader(&mut reader)?),
+        MessageType::Data => Message::Data(parse_from_reader(&mut reader)?),
+        MessageType::Extension => unimplemented!(),
+    };
+    Ok(msg)
 }
 
 impl MessageType {
@@ -77,7 +114,7 @@ impl MessageType {
             8 => Cancel,
             9 => Data,
             15 => Extension,
-            _ => panic!(),
+            _ => panic!("Unknown message type: {}", value),
         }
     }
 
@@ -99,52 +136,63 @@ impl MessageType {
     }
 }
 
-fn write_message<W: Write>(msg: &Message, w: &mut Writer<W>) -> quick_protobuf::Result<()> {
+fn write_message<W: Write>(msg: &Message, mut writer: W) -> ProtobufResult<()> {
     match msg {
-        Message::Feed(m) => m.write_message(w),
-        Message::Handshake(m) => m.write_message(w),
-        Message::Info(m) => m.write_message(w),
-        Message::Have(m) => m.write_message(w),
-        Message::Unhave(m) => m.write_message(w),
-        Message::Want(m) => m.write_message(w),
-        Message::Unwant(m) => m.write_message(w),
-        Message::Request(m) => m.write_message(w),
-        Message::Cancel(m) => m.write_message(w),
-        Message::Data(m) => m.write_message(w),
+        Message::Feed(m) => m.write_to_writer(&mut writer),
+        Message::Handshake(m) => m.write_to_writer(&mut writer),
+        Message::Info(m) => m.write_to_writer(&mut writer),
+        Message::Have(m) => m.write_to_writer(&mut writer),
+        Message::Unhave(m) => m.write_to_writer(&mut writer),
+        Message::Want(m) => m.write_to_writer(&mut writer),
+        Message::Unwant(m) => m.write_to_writer(&mut writer),
+        Message::Request(m) => m.write_to_writer(&mut writer),
+        Message::Cancel(m) => m.write_to_writer(&mut writer),
+        Message::Data(m) => m.write_to_writer(&mut writer),
         Message::Extension(bytes) => unimplemented!(),
     }
 }
 
 fn get_size(msg: &Message) -> usize {
+    fn compute_size<M: protobuf::Message>(m: &M) -> usize {
+        m.compute_size() as usize
+    }
     match msg {
-        Message::Feed(m) => m.get_size(),
-        Message::Handshake(m) => m.get_size(),
-        Message::Info(m) => m.get_size(),
-        Message::Have(m) => m.get_size(),
-        Message::Unhave(m) => m.get_size(),
-        Message::Want(m) => m.get_size(),
-        Message::Unwant(m) => m.get_size(),
-        Message::Request(m) => m.get_size(),
-        Message::Cancel(m) => m.get_size(),
-        Message::Data(m) => m.get_size(),
+        Message::Feed(m) => compute_size(m),
+        Message::Handshake(m) => compute_size(m),
+        Message::Info(m) => compute_size(m),
+        Message::Have(m) => compute_size(m),
+        Message::Unhave(m) => compute_size(m),
+        Message::Want(m) => compute_size(m),
+        Message::Unwant(m) => compute_size(m),
+        Message::Request(m) => compute_size(m),
+        Message::Cancel(m) => compute_size(m),
+        Message::Data(m) => compute_size(m),
         Message::Extension(bytes) => bytes.len(),
     }
 }
 
 fn channel_from(value: u16) -> Channel {
-    assert!((value as usize) < Channel::MAX_CHANNELS);
+    assert!(
+        (value as usize) < Channel::MAX_CHANNELS,
+        "{} {}",
+        value,
+        value as usize
+    );
     Channel(value as u8)
 }
 
-fn encode_header(channel: Channel, msg_type: MessageType) -> u16 {
-    assert!((channel.0 as usize) < Channel::MAX_CHANNELS);
-    u16::from(channel.0) << 4 | msg_type as u16
+fn encode_header(header: Header) -> u16 {
+    assert!((header.channel.0 as usize) < Channel::MAX_CHANNELS);
+    u16::from(header.channel.0) << 4 | header.message_type as u16
 }
 
-fn decode_header(header: u16) -> (Channel, MessageType) {
-    let msg_type = MessageType::from(header as u8 & 0x0f);
+pub(crate) fn decode_header(header: u16) -> Header {
+    let message_type = MessageType::from(header as u8 & 0x0f);
     let channel = channel_from(header >> 4);
-    (channel, msg_type)
+    Header {
+        channel,
+        message_type,
+    }
 }
 
 #[cfg(test)]
@@ -155,13 +203,11 @@ mod tests {
 
     #[test]
     fn test_write_info() {
-        let msg = Message::Info(schema::Info {
-            uploading: Some(false),
-            downloading: Some(true),
-        });
-        let mut v = Vec::new();
-        let mut w = Writer::new(&mut v);
-        write_msg(Channel(42), &msg, &mut w).unwrap();
+        let mut info = schema::Info::new();
+        info.set_uploading(false);
+        info.set_downloading(true);
+        let msg = Message::Info(info);
+        let v = write_msg(Channel(42), &msg).unwrap();
 
         assert_eq!(v, &[0x06, 0xa2, 0x05, 0x08, 0x00, 0x10, 0x01]);
     }
@@ -169,16 +215,12 @@ mod tests {
     #[test]
     fn test_read_info() {
         let bytes = &[0x06, 0xa2, 0x05, 0x08, 0x00, 0x10, 0x01];
-        let expected = (
-            Channel(42),
-            Message::Info(schema::Info {
-                uploading: Some(false),
-                downloading: Some(true),
-            }),
-        );
+        let mut info = schema::Info::new();
+        info.set_uploading(false);
+        info.set_downloading(true);
+        let expected = (Channel(42), Message::Info(info));
 
-        let mut r = BytesReader::from_bytes(bytes);
-        let result = read_msg(&mut r, bytes).unwrap();
+        let result = read_msg(bytes).unwrap();
         assert_eq!(result, expected);
     }
 }
