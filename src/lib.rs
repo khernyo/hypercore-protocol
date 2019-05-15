@@ -1,3 +1,5 @@
+mod wire_format;
+
 mod schema {
     #![allow(non_snake_case)]
     #![allow(non_upper_case_globals)]
@@ -8,10 +10,22 @@ mod schema {
     include!(concat!(env!("OUT_DIR"), "/protos/schema.rs"));
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Channel(u8);
+
+impl Channel {
+    const MAX_CHANNELS: usize = 128;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Message<'a> {
+    Handshake(schema::Handshake<'a>),
+    Info(schema::Info),
+    Have(schema::Have<'a>),
+    Unhave(schema::Unhave),
+    Want(schema::Want),
+    Unwant(schema::Unwant),
+    Request(schema::Request),
+    Cancel(schema::Cancel),
+    Data(schema::Data<'a>),
 }
