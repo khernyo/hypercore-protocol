@@ -13,10 +13,10 @@ pub fn write_msg<W: Write>(
 ) -> quick_protobuf::Result<()> {
     let msg_type = MessageType::from_message(&msg);
     let header = encode_header(channel, msg_type);
-    let len = sizeof_varint(header as u64) + get_size(msg);
+    let len = sizeof_varint(u64::from(header)) + get_size(msg);
 
     writer.write_varint(len as u64)?;
-    writer.write_varint(header as u64)?;
+    writer.write_varint(u64::from(header))?;
     write_message(msg, writer)
 }
 
@@ -138,7 +138,7 @@ fn channel_from(value: u16) -> Channel {
 
 fn encode_header(channel: Channel, msg_type: MessageType) -> u16 {
     assert!((channel.0 as usize) < Channel::MAX_CHANNELS);
-    (channel.0 as u16) << 4 | msg_type as u16
+    u16::from(channel.0) << 4 | msg_type as u16
 }
 
 fn decode_header(header: u16) -> (Channel, MessageType) {
