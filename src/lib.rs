@@ -19,6 +19,7 @@ impl Channel {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Message<'a> {
+    Feed(schema::Feed<'a>),
     Handshake(schema::Handshake<'a>),
     Info(schema::Info),
     Have(schema::Have<'a>),
@@ -28,4 +29,5 @@ pub enum Message<'a> {
     Request(schema::Request),
     Cancel(schema::Cancel),
     Data(schema::Data<'a>),
+    Extension(&'a [u8]),
 }

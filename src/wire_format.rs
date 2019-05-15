@@ -31,6 +31,7 @@ pub fn read_msg<'a>(
 
     let msg_len = len as usize - header_len;
     let msg = match msg_type {
+        MessageType::Feed => Message::Feed(reader.read_message_by_len(bytes, msg_len)?),
         MessageType::Handshake => Message::Handshake(reader.read_message_by_len(bytes, msg_len)?),
         MessageType::Info => Message::Info(reader.read_message_by_len(bytes, msg_len)?),
         MessageType::Have => Message::Have(reader.read_message_by_len(bytes, msg_len)?),
@@ -40,6 +41,7 @@ pub fn read_msg<'a>(
         MessageType::Request => Message::Request(reader.read_message_by_len(bytes, msg_len)?),
         MessageType::Cancel => Message::Cancel(reader.read_message_by_len(bytes, msg_len)?),
         MessageType::Data => Message::Data(reader.read_message_by_len(bytes, msg_len)?),
+        MessageType::Extension => unimplemented!(),
     };
 
     Ok((channel, msg))
@@ -47,6 +49,7 @@ pub fn read_msg<'a>(
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum MessageType {
+    Feed = 0,
     Handshake = 1,
     Info = 2,
     Have = 3,
@@ -56,12 +59,14 @@ enum MessageType {
     Request = 7,
     Cancel = 8,
     Data = 9,
+    Extension = 15,
 }
 
 impl MessageType {
     fn from(value: u8) -> MessageType {
         use MessageType::*;
         match value {
+            0 => Feed,
             1 => Handshake,
             2 => Info,
             3 => Have,
@@ -71,6 +76,7 @@ impl MessageType {
             7 => Request,
             8 => Cancel,
             9 => Data,
+            15 => Extension,
             _ => panic!(),
         }
     }
@@ -78,6 +84,7 @@ impl MessageType {
     fn from_message(msg: &Message) -> MessageType {
         use MessageType::*;
         match msg {
+            Message::Feed(_) => Feed,
             Message::Handshake(_) => Handshake,
             Message::Info(_) => Info,
             Message::Have(_) => Have,
@@ -87,12 +94,14 @@ impl MessageType {
             Message::Request(_) => Request,
             Message::Cancel(_) => Cancel,
             Message::Data(_) => Data,
+            Message::Extension(_) => Extension,
         }
     }
 }
 
 fn write_message<W: Write>(msg: &Message, w: &mut Writer<W>) -> quick_protobuf::Result<()> {
     match msg {
+        Message::Feed(m) => m.write_message(w),
         Message::Handshake(m) => m.write_message(w),
         Message::Info(m) => m.write_message(w),
         Message::Have(m) => m.write_message(w),
@@ -102,11 +111,13 @@ fn write_message<W: Write>(msg: &Message, w: &mut Writer<W>) -> quick_protobuf::
         Message::Request(m) => m.write_message(w),
         Message::Cancel(m) => m.write_message(w),
         Message::Data(m) => m.write_message(w),
+        Message::Extension(bytes) => unimplemented!(),
     }
 }
 
 fn get_size(msg: &Message) -> usize {
     match msg {
+        Message::Feed(m) => m.get_size(),
         Message::Handshake(m) => m.get_size(),
         Message::Info(m) => m.get_size(),
         Message::Have(m) => m.get_size(),
@@ -116,6 +127,7 @@ fn get_size(msg: &Message) -> usize {
         Message::Request(m) => m.get_size(),
         Message::Cancel(m) => m.get_size(),
         Message::Data(m) => m.get_size(),
+        Message::Extension(bytes) => bytes.len(),
     }
 }
 
