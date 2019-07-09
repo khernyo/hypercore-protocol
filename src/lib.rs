@@ -1,3 +1,5 @@
+use blake2_rfc::blake2b::blake2b;
+
 mod wire_format;
 
 mod schema {
@@ -30,4 +32,24 @@ pub enum Message<'a> {
     Cancel(schema::Cancel),
     Data(schema::Data<'a>),
     Extension(&'a [u8]),
+}
+
+fn discovery_key(key: &[u8]) -> [u8; 32] {
+    let mut result = [0u8; 32];
+    let hash = blake2b(32, key, b"hypercore");
+    result[..].clone_from_slice(hash.as_bytes());
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_discovery_key() {
+        assert_eq!(
+            data_encoding::HEXUPPER.encode(&discovery_key(b"01234567890123456789012345678901")),
+            "103E9C9562455F70DFE3F3F9F1DC0CF8548D72D6C4B3C5AC1B44EAEFDB6F7E65"
+        );
+    }
 }
