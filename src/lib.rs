@@ -1,4 +1,5 @@
 use blake2_rfc::blake2b::blake2b;
+use std::collections::HashMap;
 
 mod wire_format;
 
@@ -34,7 +35,25 @@ pub enum Message<'a> {
     Extension(&'a [u8]),
 }
 
-fn discovery_key(key: &[u8]) -> [u8; 32] {
+type DiscoveryKey = [u8; 32];
+
+pub struct Protocol {
+    feeds: HashMap<DiscoveryKey, ()>,
+}
+
+impl Protocol {
+    pub fn new() -> Protocol {
+        Protocol {
+            feeds: HashMap::new(),
+        }
+    }
+
+    pub fn has(&self, key: &[u8]) -> bool {
+        self.feeds.contains_key(&discovery_key(key))
+    }
+}
+
+fn discovery_key(key: &[u8]) -> DiscoveryKey {
     let mut result = [0u8; 32];
     let hash = blake2b(32, key, b"hypercore");
     result[..].clone_from_slice(hash.as_bytes());
