@@ -1,3 +1,4 @@
+use quick_protobuf::Writer;
 use sodiumoxide::crypto::generichash;
 use std::collections::HashMap;
 
@@ -54,6 +55,13 @@ impl Protocol {
     }
 }
 
+fn encode_feed(feed: schema::Feed, channel: Channel) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut w = Writer::new(&mut bytes);
+    wire_format::write_msg(channel, &Message::Feed(feed), &mut w);
+    bytes
+}
+
 fn discovery_key(key: &[u8]) -> DiscoveryKey {
     let mut hasher = generichash::State::new(32, Some(key)).unwrap();
     hasher.update(b"hypercore").unwrap();
@@ -71,13 +79,28 @@ fn random_bytes(n: usize) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use data_encoding::HEXUPPER;
+    use std::borrow::Cow;
+
     use super::*;
 
     #[test]
     fn test_discovery_key() {
         assert_eq!(
-            data_encoding::HEXUPPER.encode(&discovery_key(b"01234567890123456789012345678901")),
+            HEXUPPER.encode(&discovery_key(b"01234567890123456789012345678901")),
             "103E9C9562455F70DFE3F3F9F1DC0CF8548D72D6C4B3C5AC1B44EAEFDB6F7E65"
         );
+    }
+
+    #[test]
+    fn test_encode_feed() {
+        let feed = schema::Feed {
+            discoveryKey: Cow::Borrowed(&b"01234567890123456789012345678901"[..]),
+            nonce: None,
+        };
+        assert_eq!(
+            HEXUPPER.encode(&encode_feed(feed, Channel(42))),
+            "24A0050A203031323334353637383930313233343536373839303132333435363738393031"
+        )
     }
 }
