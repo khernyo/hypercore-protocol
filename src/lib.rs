@@ -62,6 +62,12 @@ fn discovery_key(key: &[u8]) -> DiscoveryKey {
     result
 }
 
+fn random_bytes(n: usize) -> Vec<u8> {
+    // TODO init sodiumoxide somewhere else
+    sodiumoxide::init().unwrap();
+    sodiumoxide::randombytes::randombytes(n)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
