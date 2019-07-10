@@ -1,4 +1,4 @@
-use blake2_rfc::blake2b::blake2b;
+use sodiumoxide::crypto::generichash;
 use std::collections::HashMap;
 
 mod wire_format;
@@ -54,9 +54,11 @@ impl Protocol {
 }
 
 fn discovery_key(key: &[u8]) -> DiscoveryKey {
+    let mut hasher = generichash::State::new(32, Some(key)).unwrap();
+    hasher.update(b"hypercore").unwrap();
+    let digest = hasher.finalize().unwrap();
     let mut result = [0u8; 32];
-    let hash = blake2b(32, key, b"hypercore");
-    result[..].clone_from_slice(hash.as_bytes());
+    result[..].clone_from_slice(digest.as_ref());
     result
 }
 

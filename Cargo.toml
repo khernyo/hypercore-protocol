@@ -6,8 +6,8 @@ authors = ["Szabolcs Berecz <szabolcs.berecz@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-blake2-rfc = "0.2.18"
 quick-protobuf = "0.6"
+sodiumoxide = "0.2.2"
 
 [dev-dependencies]
 data-encoding = "2.1.2"
