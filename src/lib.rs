@@ -1,6 +1,7 @@
 use sodiumoxide::crypto::generichash;
 use std::collections::HashMap;
 
+mod crypto_stream;
 mod wire_format;
 
 mod schema {

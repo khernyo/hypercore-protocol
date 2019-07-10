@@ -7,10 +7,12 @@ edition = "2018"
 
 [dependencies]
 quick-protobuf = "0.6"
+rust-crypto = "0.2.36"
 sodiumoxide = "0.2.2"
 
 [dev-dependencies]
 data-encoding = "2.1.2"
+rand = "0.7.0"
 
 [build-dependencies]
 pb-rs = "0.8"
