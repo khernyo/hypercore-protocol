@@ -9,7 +9,7 @@ pub fn crypto_stream_xor_instance(nonce: &[u8], key: &[u8]) -> Xor {
 pub struct Xor(Salsa20);
 
 impl Xor {
-    fn update(&mut self, input: &[u8], output: &mut [u8]) {
+    pub fn update(&mut self, input: &[u8], output: &mut [u8]) {
         self.0.process(input, output);
     }
 }
