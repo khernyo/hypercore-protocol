@@ -76,3 +76,35 @@ fn basic() {
     assert_ne!(pp.a.sent.borrow()[0], pp.b.sent.borrow()[0]);
     assert_ne!(pp.a.sent.borrow()[1], pp.b.sent.borrow()[1]);
 }
+
+#[test]
+fn basic_with_early_messages() {
+    // I'm not sure this test is necessary or valid even. It delivers messages sooner compared
+    //  to `basic`
+
+    init();
+
+    let mut pp = ProtocolPair::new();
+
+    let feed_opts = FeedOptions {
+        discovery_key: None,
+    };
+
+    pp.run();
+    pp.a.protocol.feed(&KEY, feed_opts.clone());
+    pp.run();
+    pp.b.protocol.feed(&KEY, feed_opts.clone());
+    pp.run();
+
+    assert_eq!(
+        pp.a.feed_events.borrow()[..],
+        vec![FeedEvent::Handshake][..]
+    );
+    assert_eq!(pp.b.feed_events.borrow()[..], vec![][..]);
+
+    assert_eq!(pp.a.sent.borrow().len(), 2);
+    assert_eq!(pp.b.sent.borrow().len(), 2);
+
+    assert_ne!(pp.a.sent.borrow()[0], pp.b.sent.borrow()[0]);
+    assert_ne!(pp.a.sent.borrow()[1], pp.b.sent.borrow()[1]);
+}
