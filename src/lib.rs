@@ -6,6 +6,9 @@ mod feed;
 pub mod protocol;
 mod wire_format;
 
+#[cfg(test)]
+mod tests;
+
 pub use feed::{FeedEvent, FeedEventEmitter};
 
 include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));

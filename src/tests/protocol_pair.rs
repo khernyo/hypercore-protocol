@@ -4,16 +4,16 @@ use std::sync::mpsc;
 
 use log::trace;
 
-use hypercore_protocol::protocol::{Protocol, ProtocolOpts, Stream};
-use hypercore_protocol::{FeedEvent, FeedEventEmitter};
+use crate::protocol::{Protocol, ProtocolOpts, Stream};
+use crate::{FeedEvent, FeedEventEmitter};
 
-struct ProtocolPair {
-    a: ProtocolX,
-    b: ProtocolX,
+pub struct ProtocolPair {
+    pub a: ProtocolX,
+    pub b: ProtocolX,
 }
 
 impl ProtocolPair {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let (sender1, receiver1) = mpsc::channel();
         let (sender2, receiver2) = mpsc::channel();
 
@@ -24,7 +24,7 @@ impl ProtocolPair {
         }
     }
 
-    fn run(&mut self) {
+    pub fn run(&mut self) {
         loop {
             let a_got_message = self.a.process();
             let b_got_message = self.b.process();
@@ -35,12 +35,12 @@ impl ProtocolPair {
     }
 }
 
-struct ProtocolX {
-    protocol: Protocol<Emitter, ChannelStream>,
+pub struct ProtocolX {
+    pub protocol: Protocol<Emitter, ChannelStream>,
     receiver: mpsc::Receiver<Vec<u8>>,
 
-    sent: Rc<RefCell<Vec<Vec<u8>>>>,
-    feed_events: Rc<RefCell<Vec<FeedEvent>>>,
+    pub sent: Rc<RefCell<Vec<Vec<u8>>>>,
+    pub feed_events: Rc<RefCell<Vec<FeedEvent>>>,
 }
 
 impl ProtocolX {
@@ -83,7 +83,7 @@ impl ProtocolX {
     }
 }
 
-struct ChannelStream {
+pub struct ChannelStream {
     sender: mpsc::Sender<Vec<u8>>,
     sent: Rc<RefCell<Vec<Vec<u8>>>>,
 }
@@ -96,7 +96,7 @@ impl Stream for ChannelStream {
     }
 }
 
-struct Emitter(Rc<RefCell<Vec<FeedEvent>>>);
+pub struct Emitter(Rc<RefCell<Vec<FeedEvent>>>);
 impl FeedEventEmitter for Emitter {
     fn emit(&mut self, event: FeedEvent) {
         trace!(

@@ -1,6 +1,4 @@
-extern crate hypercore_protocol;
-
-include!("protocol_pair.rs");
+mod protocol_pair;
 
 use std::ops::Deref;
 use std::thread;
@@ -9,7 +7,9 @@ use once_cell::sync::Lazy;
 use slog::{Drain, Logger};
 use slog_scope::GlobalLoggerGuard;
 
-use hypercore_protocol::protocol::{FeedOptions, Key};
+use crate::protocol::{FeedOptions, Id, Key};
+use crate::tests::protocol_pair::ProtocolPair;
+use crate::FeedEvent;
 
 const KEY: Key = Key(*b"01234567890123456789012345678901");
 const OTHER_KEY: Key = Key(*b"12345678901234567890123456789012");
