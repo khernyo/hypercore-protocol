@@ -13,14 +13,13 @@ pub struct ProtocolPair {
 }
 
 impl ProtocolPair {
-    pub fn new() -> Self {
+    pub fn new(opts_a: &ProtocolOpts, opts_b: &ProtocolOpts) -> Self {
         let (sender1, receiver1) = mpsc::channel();
         let (sender2, receiver2) = mpsc::channel();
 
-        let opts = ProtocolOpts::default();
         Self {
-            a: ProtocolX::new(&opts, sender1, receiver2),
-            b: ProtocolX::new(&opts, sender2, receiver1),
+            a: ProtocolX::new(opts_a, sender1, receiver2),
+            b: ProtocolX::new(opts_b, sender2, receiver1),
         }
     }
 

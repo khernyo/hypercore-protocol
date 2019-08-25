@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use slog::{Drain, Logger};
 use slog_scope::GlobalLoggerGuard;
 
-use crate::protocol::{FeedOptions, Id, Key};
+use crate::protocol::{FeedOptions, Id, Key, ProtocolOpts};
 use crate::tests::protocol_pair::ProtocolPair;
 use crate::FeedEvent;
 
@@ -50,7 +50,8 @@ fn init() {
 fn basic() {
     init();
 
-    let mut pp = ProtocolPair::new();
+    let opts = ProtocolOpts::default();
+    let mut pp = ProtocolPair::new(&opts, &opts);
 
     let feed_opts = FeedOptions {
         discovery_key: None,
@@ -84,7 +85,8 @@ fn basic_with_early_messages() {
 
     init();
 
-    let mut pp = ProtocolPair::new();
+    let opts = ProtocolOpts::default();
+    let mut pp = ProtocolPair::new(&opts, &opts);
 
     let feed_opts = FeedOptions {
         discovery_key: None,
@@ -107,4 +109,52 @@ fn basic_with_early_messages() {
 
     assert_ne!(pp.a.sent.borrow()[0], pp.b.sent.borrow()[0]);
     assert_ne!(pp.a.sent.borrow()[1], pp.b.sent.borrow()[1]);
+}
+
+#[test]
+fn basic_with_handshake_options() {
+    let data = vec![
+        "eeaa62fbb11ba521cce58cf3fae42deb15d94a0436fc7fa0cbba8f130e7c0499".as_ref(),
+        "8c797667bf307d82c51a8308fe477b781a13708e0ec1f2cc7f497392574e2464".as_ref(),
+    ]
+    .join("")
+    .as_bytes()
+    .to_vec();
+
+    let opts_a = ProtocolOpts {
+        id: Some(Id([b'a'; 32])),
+        live: Some(true),
+        user_data: Some(data.clone()),
+        ..Default::default()
+    };
+    let opts_b = ProtocolOpts {
+        id: Some(Id([b'b'; 32])),
+        live: Some(false),
+        ack: Some(true),
+        ..Default::default()
+    };
+    let mut pp = ProtocolPair::new(&opts_a, &opts_b);
+
+    pp.a.protocol.feed(&KEY, FeedOptions::default());
+    pp.b.protocol.feed(&KEY, FeedOptions::default());
+
+    pp.run();
+
+    assert_eq!(pp.a.protocol.id, Id([b'a'; 32]));
+    assert_eq!(pp.a.protocol.live, true);
+    assert_eq!(pp.a.protocol.ack, false);
+    assert_eq!(pp.a.protocol.user_data, Some(data.clone()));
+    assert_eq!(*pp.a.protocol.remote_id.borrow(), Some(Id([b'b'; 32])));
+    assert_eq!(pp.a.protocol.remote_live.get(), Some(false));
+    assert_eq!(*pp.a.protocol.remote_user_data.borrow(), None);
+    assert_eq!(pp.a.protocol.remote_ack.get(), Some(true));
+
+    assert_eq!(pp.b.protocol.id, Id([b'b'; 32]));
+    assert_eq!(pp.b.protocol.live, false);
+    assert_eq!(pp.b.protocol.ack, true);
+    assert_eq!(pp.b.protocol.user_data, None);
+    assert_eq!(*pp.b.protocol.remote_id.borrow(), Some(Id([b'a'; 32])));
+    assert_eq!(pp.b.protocol.remote_live.get(), Some(true));
+    assert_eq!(*pp.b.protocol.remote_user_data.borrow(), Some(data));
+    assert_eq!(pp.b.protocol.remote_ack.get(), Some(false));
 }

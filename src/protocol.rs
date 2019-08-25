@@ -121,7 +121,7 @@ impl TryFrom<&[u8]> for Nonce {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct Id([u8; 32]);
+pub struct Id(pub(crate) [u8; 32]);
 
 impl TryFrom<&[u8]> for Id {
     type Error = ();
@@ -150,14 +150,14 @@ pub struct Protocol<E: FeedEventEmitter, S: Stream> {
     stream: Rc<RefCell<S>>,
     emitter: Rc<RefCell<E>>,
 
-    id: Id,
-    live: bool,
-    ack: bool,
-    user_data: Option<Vec<u8>>,
-    remote_id: Rc<RefCell<Option<Id>>>,
-    remote_live: Rc<Cell<Option<bool>>>,
-    remote_ack: Rc<Cell<Option<bool>>>,
-    remote_user_data: Rc<RefCell<Option<Vec<u8>>>>,
+    pub(crate) id: Id,
+    pub(crate) live: bool,
+    pub(crate) ack: bool,
+    pub(crate) user_data: Option<Vec<u8>>,
+    pub(crate) remote_id: Rc<RefCell<Option<Id>>>,
+    pub(crate) remote_live: Rc<Cell<Option<bool>>>,
+    pub(crate) remote_ack: Rc<Cell<Option<bool>>>,
+    pub(crate) remote_user_data: Rc<RefCell<Option<Vec<u8>>>>,
 
     destroyed: Rc<Cell<bool>>,
     encrypted: bool,
@@ -220,6 +220,14 @@ impl Default for ProtocolOpts {
 #[derive(Clone, Debug)]
 pub struct FeedOptions {
     pub discovery_key: Option<DiscoveryKey>,
+}
+
+impl Default for FeedOptions {
+    fn default() -> Self {
+        FeedOptions {
+            discovery_key: None,
+        }
+    }
 }
 
 impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
