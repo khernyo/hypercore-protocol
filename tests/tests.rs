@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use slog::{Drain, Logger};
 use slog_scope::GlobalLoggerGuard;
 
-use hypercore_protocol::{FeedOptions, Key};
+use hypercore_protocol::protocol::{FeedOptions, Key};
 
 const KEY: Key = Key(*b"01234567890123456789012345678901");
 const OTHER_KEY: Key = Key(*b"12345678901234567890123456789012");

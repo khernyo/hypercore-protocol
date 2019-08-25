@@ -2,8 +2,9 @@ use std::fmt::{Debug, Error, Formatter};
 
 use slog::{o, trace, Drain, Logger};
 
+use crate::protocol::{Channel, DiscoveryKey, Key, Message, MessageType};
+use crate::schema;
 use crate::wire_format::{self, write_msg};
-use crate::{schema, Channel, DiscoveryKey, Key, Message, MessageType};
 
 pub trait FeedStream {
     fn _push(&mut self, bytes: &[u8]);

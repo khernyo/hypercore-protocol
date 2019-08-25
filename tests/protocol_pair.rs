@@ -4,7 +4,8 @@ use std::sync::mpsc;
 
 use log::trace;
 
-use hypercore_protocol::{FeedEvent, FeedEventEmitter, Protocol, ProtocolOpts, Stream};
+use hypercore_protocol::protocol::{Protocol, ProtocolOpts, Stream};
+use hypercore_protocol::{FeedEvent, FeedEventEmitter};
 
 struct ProtocolPair {
     a: ProtocolX,

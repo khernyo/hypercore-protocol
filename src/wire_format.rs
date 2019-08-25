@@ -3,7 +3,7 @@ use std::io::{BufReader, Read, Write};
 use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
 use protobuf::{self, parse_from_reader, Message as _, ProtobufResult};
 
-use crate::{Channel, Header, Message, MessageType};
+use crate::protocol::{Channel, Header, Message, MessageType};
 
 pub(crate) fn write_msg(channel: Channel, msg: &Message) -> ProtobufResult<Vec<u8>> {
     log::trace!("write_msg({:?}, {:?})", channel, msg);
