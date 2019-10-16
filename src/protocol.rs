@@ -79,7 +79,7 @@ impl Message {
 pub struct Key(pub [u8; 32]);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct DiscoveryKey([u8; 32]);
+pub struct DiscoveryKey(pub(crate) [u8; 32]);
 
 impl TryFrom<&[u8]> for DiscoveryKey {
     type Error = ();
@@ -551,7 +551,9 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
             .borrow_mut()
             .remote_id = Some(id);
 
-        //        self.emit("feed", feed.discoveryKey);
+        self.emit(FeedEvent::Feed(
+            DiscoveryKey::try_from(feed.get_discoveryKey()).unwrap(),
+        ));
     }
 
     fn _onmessage(&mut self, bytes: &[u8], mut start: usize, end: usize) {
@@ -775,8 +777,8 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
         unimplemented!()
     }
 
-    fn emit(&self) -> ! {
-        unimplemented!()
+    fn emit(&self, event: FeedEvent) {
+        self.emitter.borrow_mut().emit(event);
     }
 }
 

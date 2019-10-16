@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Error, Formatter};
 
+use enum_as_inner::EnumAsInner;
 use slog::{o, trace, Drain, Logger};
 
 use crate::protocol::{Channel, DiscoveryKey, Key, Message, MessageType};
@@ -70,6 +71,12 @@ impl<FS: FeedStream, E: FeedEventEmitter> Feed<FS, E> {
     pub(crate) fn handshake(&mut self, handshake: schema::Handshake) {
         slog::trace!(self.log, "Sending handshake: {:?}", handshake);
         let bytes = write_msg(self.id.unwrap(), &Message::Handshake(handshake)).unwrap();
+        self.stream._push(&bytes);
+    }
+
+    pub(crate) fn data(&mut self, data: schema::Data) {
+        slog::trace!(self.log, "Sending data: {:?}", data);
+        let bytes = write_msg(self.id.unwrap(), &Message::Data(data)).unwrap();
         self.stream._push(&bytes);
     }
 
@@ -145,9 +152,11 @@ impl<FS: FeedStream, E: FeedEventEmitter> Feed<FS, E> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, EnumAsInner)]
 pub enum FeedEvent {
+    Feed(DiscoveryKey),
     Handshake,
+
     // TODO not all message types will be emitted, and it should be reflected. (Handshake and Feed are not emitted, maybe others, too)
     Message(Message),
 }
