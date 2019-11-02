@@ -3,9 +3,12 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
+use std::sync::Mutex;
 
 use integer_encoding::VarInt;
+use lazy_static::lazy_static;
 use protobuf::parse_from_bytes;
+use rand::{thread_rng, Rng};
 use slog::{o, trace, Drain, Logger};
 use sodiumoxide::crypto::generichash;
 
@@ -944,11 +947,30 @@ fn random_bytes(n: usize) -> Vec<u8> {
     buf
 }
 
+/// For debugging
 const NOT_RANDOM_BYTES: Option<[u8; 1024]> = None;
+
+/// For debugging
+const RNG_SEED: Option<[u8; 32]> = Some([
+    65, 154, 64, 75, 10, 89, 248, 117, 64, 250, 77, 37, 77, 12, 200, 128, 70, 113, 252, 186, 212,
+    237, 28, 221, 200, 86, 218, 95, 158, 124, 215, 63,
+]);
+
+lazy_static! {
+    static ref RNG: Option<Mutex<rand::rngs::StdRng>> = Some(Mutex::new({
+        use rand::SeedableRng;
+        let seed: [u8; 32] = RNG_SEED.unwrap_or_else(|| rand::thread_rng().gen());
+        eprintln!("Rng seed: {:?}", seed);
+        rand::rngs::StdRng::from_seed(seed.into())
+    }));
+}
 
 fn random_bytes_into(buf: &mut [u8]) {
     if let Some(bs) = NOT_RANDOM_BYTES {
         buf.copy_from_slice(&bs[..buf.len()]);
+    } else if let Some(ref rng_mutex) = *RNG {
+        let mut rng = rng_mutex.lock().unwrap();
+        rng.fill(buf);
     } else {
         // TODO init sodiumoxide somewhere else
         sodiumoxide::init().unwrap();
