@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
 
-use log::trace;
+use slog::{o, trace, Drain, Logger};
 
 use crate::protocol::{Protocol, ProtocolOpts, Stream};
 use crate::{FeedEvent, FeedEventEmitter};
@@ -13,13 +13,23 @@ pub struct ProtocolPair {
 }
 
 impl ProtocolPair {
-    pub fn new(opts_a: &ProtocolOpts, opts_b: &ProtocolOpts) -> Self {
+    pub fn new<L: Into<Option<slog::Logger>>>(
+        logger: L,
+        opts_a: &ProtocolOpts,
+        opts_b: &ProtocolOpts,
+    ) -> Self {
         let (sender1, receiver1) = mpsc::channel();
         let (sender2, receiver2) = mpsc::channel();
 
+        let logger = logger
+            .into()
+            .unwrap_or_else(|| Logger::root(slog_stdlog::StdLog.fuse(), o!()));
+        let a_logger = logger.new(o!("endpoint" => "a"));
+        let b_logger = logger.new(o!("endpoint" => "b"));
+
         Self {
-            a: ProtocolX::new(opts_a, sender1, receiver2),
-            b: ProtocolX::new(opts_b, sender2, receiver1),
+            a: ProtocolX::new(a_logger, opts_a, sender1, receiver2),
+            b: ProtocolX::new(b_logger, opts_b, sender2, receiver1),
         }
     }
 
@@ -35,6 +45,7 @@ impl ProtocolPair {
 }
 
 pub struct ProtocolX {
+    logger: Logger,
     pub protocol: Protocol<Emitter, ChannelStream>,
     receiver: mpsc::Receiver<Vec<u8>>,
 
@@ -44,6 +55,7 @@ pub struct ProtocolX {
 
 impl ProtocolX {
     fn new(
+        logger: Logger,
         protocol_opts: &ProtocolOpts,
         sender: mpsc::Sender<Vec<u8>>,
         receiver: mpsc::Receiver<Vec<u8>>,
@@ -51,10 +63,15 @@ impl ProtocolX {
         let sent = Rc::new(RefCell::new(Vec::new()));
         let feed_events = Rc::new(RefCell::new(Vec::new()));
         Self {
+            logger: logger.clone(),
             protocol: Protocol::new(
-                None,
-                Emitter(feed_events.clone()),
+                logger.clone(),
+                Emitter {
+                    logger: logger.clone(),
+                    feed_events: feed_events.clone(),
+                },
                 ChannelStream {
+                    logger,
                     sender,
                     sent: sent.clone(),
                 },
@@ -72,7 +89,7 @@ impl ProtocolX {
             match self.receiver.try_recv() {
                 Ok(mut bytes) => {
                     got_message = true;
-                    trace!("Received bytes: {:?}", bytes);
+                    trace!(self.logger, "Received bytes: {:?}", bytes);
                     self.protocol._write(&mut bytes);
                 }
                 Err(_) => break,
@@ -83,26 +100,31 @@ impl ProtocolX {
 }
 
 pub struct ChannelStream {
+    logger: Logger,
     sender: mpsc::Sender<Vec<u8>>,
     sent: Rc<RefCell<Vec<Vec<u8>>>>,
 }
 
 impl Stream for ChannelStream {
     fn _push(&mut self, bytes: &mut [u8]) {
-        trace!("Sending bytes: {:?}", bytes);
+        trace!(self.logger, "Sending bytes: {:?}", bytes);
         self.sender.send(bytes.to_vec()).unwrap();
         self.sent.borrow_mut().push(bytes.to_vec());
     }
 }
 
-pub struct Emitter(Rc<RefCell<Vec<FeedEvent>>>);
+pub struct Emitter {
+    logger: Logger,
+    feed_events: Rc<RefCell<Vec<FeedEvent>>>,
+}
 impl FeedEventEmitter for Emitter {
     fn emit(&mut self, event: FeedEvent) {
         trace!(
+            self.logger,
             "Emitting from {:x}: {:?}",
             self as *const Emitter as usize,
             event
         );
-        self.0.borrow_mut().push(event);
+        self.feed_events.borrow_mut().push(event);
     }
 }

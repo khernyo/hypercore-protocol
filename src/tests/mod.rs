@@ -52,7 +52,7 @@ fn basic() {
     init_logger();
 
     let opts = ProtocolOpts::default();
-    let mut pp = ProtocolPair::new(&opts, &opts);
+    let mut pp = ProtocolPair::new(None, &opts, &opts);
 
     let feed_opts = FeedOptions {
         discovery_key: None,
@@ -91,7 +91,7 @@ fn basic_with_early_messages() {
     init_logger();
 
     let opts = ProtocolOpts::default();
-    let mut pp = ProtocolPair::new(&opts, &opts);
+    let mut pp = ProtocolPair::new(None, &opts, &opts);
 
     let feed_opts = FeedOptions {
         discovery_key: None,
@@ -144,7 +144,7 @@ fn basic_with_handshake_options() {
         ack: Some(true),
         ..Default::default()
     };
-    let mut pp = ProtocolPair::new(&opts_a, &opts_b);
+    let mut pp = ProtocolPair::new(None, &opts_a, &opts_b);
 
     pp.a.protocol.feed(&KEY, FeedOptions::default());
     pp.b.protocol.feed(&KEY, FeedOptions::default());
@@ -174,7 +174,7 @@ fn basic_with_handshake_options() {
 fn send_messages() {
     init_logger();
 
-    let mut pp = ProtocolPair::new(&ProtocolOpts::default(), &ProtocolOpts::default());
+    let mut pp = ProtocolPair::new(None, &ProtocolOpts::default(), &ProtocolOpts::default());
 
     let ch1 = pp.a.protocol.feed(&KEY, FeedOptions::default());
     let ch2 = pp.b.protocol.feed(&KEY, FeedOptions::default());
