@@ -383,6 +383,7 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
                 .unwrap()
                 .update(&r#box.clone(), &mut r#box);
         }
+        trace!(self.log, "Encrypted: {:?}", r#box);
         self._keep_alive.set(0);
         self.push(&mut r#box);
 
@@ -534,7 +535,18 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
                 self.key,
                 self._remote_xor.is_some()
             );
+
+            if self.encrypted && self.key.is_none() {
+                // Without a key, encrypted messages would be parsed as unencrypted, so let's
+                // just panic for now.
+                // This can happen when two messages are received before calling Protocol::feed().
+                // The first message is unencrypted so it's ok, but the following messages are
+                // encrypted.
+                panic!("Key is not available for decryption");
+            }
+
             if self.encrypted && self.key.is_some() && self._remote_xor.is_none() {
+                // TODO verify that `dk` is the discovery key for `self.key`
                 self._remote_xor = Some(crypto_stream_xor_instance(
                     &self._remote_nonce.as_ref().unwrap().0,
                     &self.key.as_ref().unwrap().0,
@@ -616,6 +628,7 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
         if let Some(ref mut remote_xor) = self._remote_xor {
             remote_xor.update(&bytes.to_owned(), bytes)
         }
+        trace!(self.log, "Decrypted: {:?}", bytes);
 
         while start < bytes.len() && !self.destroyed.get() {
             trace!(self.log, "missing: {}", self._missing);
@@ -835,6 +848,7 @@ impl<E: FeedEventEmitter, S: Stream> FeedStream for FeedStreamHack<E, S> {
         if let Some(xor) = self._xor.borrow_mut().as_mut() {
             xor.update(bytes, &mut buf);
         }
+        log::trace!("Encrypted: {:?}", buf);
 
         self.stream.borrow_mut()._push(&mut buf);
     }
@@ -951,10 +965,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
 const NOT_RANDOM_BYTES: Option<[u8; 1024]> = None;
 
 /// For debugging
-const RNG_SEED: Option<[u8; 32]> = Some([
-    65, 154, 64, 75, 10, 89, 248, 117, 64, 250, 77, 37, 77, 12, 200, 128, 70, 113, 252, 186, 212,
-    237, 28, 221, 200, 86, 218, 95, 158, 124, 215, 63,
-]);
+const RNG_SEED: Option<[u8; 32]> = None;
 
 lazy_static! {
     static ref RNG: Option<Mutex<rand::rngs::StdRng>> = Some(Mutex::new({

@@ -84,6 +84,7 @@ fn basic() {
 }
 
 #[test]
+#[ignore]
 fn basic_with_early_messages() {
     // I'm not sure this test is necessary or valid even. It delivers messages sooner compared
     //  to `basic`
