@@ -199,6 +199,8 @@ fn send_messages() {
         ch1.unwrap().borrow().discovery_key.as_ref().unwrap()
     );
 
+    return; // TODO
+
     //    ch2.on('data', function(data) {
     //        t.same(data, { index: 42, signature: null, value: bufferFrom('hi'), nodes: [] })
     //    })
