@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use slog::{o, trace, Drain, Logger};
 
-use crate::protocol::{Protocol, ProtocolOpts, Stream};
+use crate::protocol::{DiscoveryKey, Protocol, ProtocolOpts, Stream};
 use crate::{FeedEvent, FeedEventEmitter};
 
 pub struct ProtocolPair {
@@ -50,7 +50,7 @@ pub struct ProtocolX {
     receiver: mpsc::Receiver<Vec<u8>>,
 
     pub sent: Rc<RefCell<Vec<Vec<u8>>>>,
-    pub feed_events: Rc<RefCell<Vec<FeedEvent>>>,
+    pub feed_events: Rc<RefCell<Vec<(DiscoveryKey, FeedEvent)>>>,
 }
 
 impl ProtocolX {
@@ -115,16 +115,18 @@ impl Stream for ChannelStream {
 
 pub struct Emitter {
     logger: Logger,
-    feed_events: Rc<RefCell<Vec<FeedEvent>>>,
+    feed_events: Rc<RefCell<Vec<(DiscoveryKey, FeedEvent)>>>,
 }
 impl FeedEventEmitter for Emitter {
-    fn emit(&mut self, event: FeedEvent) {
+    fn emit(&mut self, discovery_key: &DiscoveryKey, event: FeedEvent) {
         trace!(
             self.logger,
-            "Emitting from {:x}: {:?}",
-            self as *const Emitter as usize,
+            "Emitting from {:?}: {:?}",
+            discovery_key,
             event
         );
-        self.feed_events.borrow_mut().push(event);
+        self.feed_events
+            .borrow_mut()
+            .push((discovery_key.clone(), event));
     }
 }

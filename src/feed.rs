@@ -136,7 +136,10 @@ impl<FS: FeedStream, E: FeedEventEmitter> Feed<FS, E> {
         }
 
         if self._buffer.is_none() {
-            self.emitter.emit(FeedEvent::Message(message));
+            self.emitter.emit(
+                self.discovery_key.as_ref().unwrap(),
+                FeedEvent::Message(message),
+            );
             return;
         }
 
@@ -161,7 +164,7 @@ pub enum FeedEvent {
     Message(Message),
 }
 pub trait FeedEventEmitter {
-    fn emit(&mut self, event: FeedEvent);
+    fn emit(&mut self, discovery_key: &DiscoveryKey, event: FeedEvent);
 }
 
 #[cfg(test)]
@@ -182,7 +185,7 @@ mod tests {
 
     struct TestEmitter<'a>(&'a mut Vec<FeedEvent>);
     impl<'a> FeedEventEmitter for TestEmitter<'a> {
-        fn emit(&mut self, event: FeedEvent) {
+        fn emit(&mut self, discovery_key: &DiscoveryKey, event: FeedEvent) {
             self.0.push(event);
         }
     }

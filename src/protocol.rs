@@ -476,7 +476,7 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
         }
         let ch = Feed::new(
             self.log.clone(),
-            FeedStreamHack::new(self),
+            FeedStreamHack::new(dk.clone(), self),
             FeedEventEmitterImpl::new(self),
         );
         self._feeds.insert(dk.clone(), Rc::new(RefCell::new(ch)));
@@ -566,7 +566,7 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
             .borrow_mut()
             .remote_id = Some(id);
 
-        self.emit(FeedEvent::Feed(dk));
+        self.emit(&dk.clone(), FeedEvent::Feed(dk));
     }
 
     fn _onmessage(&mut self, bytes: &[u8], mut start: usize, end: usize) {
@@ -791,12 +791,14 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
         unimplemented!()
     }
 
-    fn emit(&self, event: FeedEvent) {
-        self.emitter.borrow_mut().emit(event);
+    fn emit(&self, discovery_key: &DiscoveryKey, event: FeedEvent) {
+        self.emitter.borrow_mut().emit(discovery_key, event);
     }
 }
 
 pub struct FeedStreamHack<E: FeedEventEmitter, S: Stream> {
+    discovery_key: DiscoveryKey,
+
     stream: Rc<RefCell<S>>,
     emitter: Rc<RefCell<E>>,
 
@@ -814,8 +816,10 @@ pub struct FeedStreamHack<E: FeedEventEmitter, S: Stream> {
     _keep_alive: Rc<Cell<u8>>,
 }
 impl<E: FeedEventEmitter, S: Stream> FeedStreamHack<E, S> {
-    fn new(protocol: &Protocol<E, S>) -> Self {
+    fn new(discovery_key: DiscoveryKey, protocol: &Protocol<E, S>) -> Self {
         FeedStreamHack {
+            discovery_key,
+
             stream: protocol.stream.clone(),
             emitter: protocol.emitter.clone(),
 
@@ -880,7 +884,9 @@ impl<E: FeedEventEmitter, S: Stream> FeedStream for FeedStreamHack<E, S> {
             None
         });
 
-        self.emitter.borrow_mut().emit(FeedEvent::Handshake);
+        self.emitter
+            .borrow_mut()
+            .emit(&self.discovery_key, FeedEvent::Handshake);
     }
 }
 
@@ -899,7 +905,7 @@ impl FeedEventEmitterImpl {
     }
 }
 impl FeedEventEmitter for FeedEventEmitterImpl {
-    fn emit(&mut self, event: FeedEvent) {
+    fn emit(&mut self, discovery_key: &DiscoveryKey, event: FeedEvent) {
         unimplemented!()
     }
 }

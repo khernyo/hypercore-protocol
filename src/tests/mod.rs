@@ -69,11 +69,17 @@ fn basic() {
     ]);
     assert_eq!(
         pp.a.feed_events.borrow()[..],
-        vec![FeedEvent::Feed(dk.clone()), FeedEvent::Handshake][..]
+        vec![
+            (dk.clone(), FeedEvent::Feed(dk.clone())),
+            (dk.clone(), FeedEvent::Handshake)
+        ][..]
     );
     assert_eq!(
         pp.b.feed_events.borrow()[..],
-        vec![FeedEvent::Feed(dk), FeedEvent::Handshake][..]
+        vec![
+            (dk.clone(), FeedEvent::Feed(dk.clone())),
+            (dk.clone(), FeedEvent::Handshake)
+        ][..]
     );
 
     assert_eq!(pp.a.sent.borrow().len(), 2);
@@ -110,9 +116,15 @@ fn basic_with_early_messages() {
     ]);
     assert_eq!(
         pp.a.feed_events.borrow()[..],
-        vec![FeedEvent::Feed(dk.clone()), FeedEvent::Handshake][..]
+        vec![
+            (dk.clone(), FeedEvent::Feed(dk.clone())),
+            (dk.clone(), FeedEvent::Handshake)
+        ][..]
     );
-    assert_eq!(pp.b.feed_events.borrow()[..], vec![FeedEvent::Feed(dk)][..]);
+    assert_eq!(
+        pp.b.feed_events.borrow()[..],
+        vec![(dk.clone(), FeedEvent::Feed(dk))][..]
+    );
 
     assert_eq!(pp.a.sent.borrow().len(), 2);
     assert_eq!(pp.b.sent.borrow().len(), 2);
@@ -188,12 +200,24 @@ fn send_messages() {
         v
     }
 
-    let a_feed_event = single(pp.a.feed_events.borrow().iter().filter_map(|e| e.as_feed())).clone();
+    let a_feed_event = single(
+        pp.a.feed_events
+            .borrow()
+            .iter()
+            .filter_map(|e| e.1.as_feed()),
+    )
+    .clone();
     assert_eq!(
         &a_feed_event,
         ch2.unwrap().borrow().discovery_key.as_ref().unwrap()
     );
-    let b_feed_event = single(pp.b.feed_events.borrow().iter().filter_map(|e| e.as_feed())).clone();
+    let b_feed_event = single(
+        pp.b.feed_events
+            .borrow()
+            .iter()
+            .filter_map(|e| e.1.as_feed()),
+    )
+    .clone();
     assert_eq!(
         &b_feed_event,
         ch1.unwrap().borrow().discovery_key.as_ref().unwrap()
