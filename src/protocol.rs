@@ -566,9 +566,7 @@ impl<E: FeedEventEmitter, S: Stream> Protocol<E, S> {
             .borrow_mut()
             .remote_id = Some(id);
 
-        self.emit(FeedEvent::Feed(
-            DiscoveryKey::try_from(feed.get_discoveryKey()).unwrap(),
-        ));
+        self.emit(FeedEvent::Feed(dk));
     }
 
     fn _onmessage(&mut self, bytes: &[u8], mut start: usize, end: usize) {
